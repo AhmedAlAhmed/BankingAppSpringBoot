@@ -1,1 +1,2 @@
-# BankingAppSpringBoot
+# BankingAppAssignment
+Banking app assignment.
