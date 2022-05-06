@@ -1,6 +1,5 @@
 package com.example.bankmanagement.entities;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -12,19 +11,34 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @NoArgsConstructor
-@Table(name = "accounts")
-public class Account {
+@Table(name = "transactions")
+public class Transaction {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "id", nullable = false)
     private Long id;
 
-    private String firstName;
-    private String lastName;
-    private String email;
-    // avoid re-calculate the balance on every request.
-    private double currentBalance;
+    @OneToOne
+    @JoinColumn(name = "source_account_id", nullable = true)
+    private Account sourceAccount;
+
+    @OneToOne
+    @JoinColumn(name = "destination_account_id", nullable = true)
+    private Account destinationAccount;
+
+    private String currency;
+
+    private double amount;
+
+    private double fee;
+
+    private String transactionType;
+
     private LocalDateTime createdAt = LocalDateTime.now();
+
     private LocalDateTime updatedAt;
+
     private LocalDateTime deletedAt;
 }
+
+
