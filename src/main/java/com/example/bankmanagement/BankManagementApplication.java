@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+@OpenAPIDefinition(info = @Info(title = "Banking App API", version = "1.0", description = "Simple Banking Application - Assignment"))
 @SpringBootApplication
 public class BankManagementApplication {
 
