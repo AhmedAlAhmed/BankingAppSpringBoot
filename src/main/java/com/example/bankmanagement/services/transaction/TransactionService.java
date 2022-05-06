@@ -76,9 +76,6 @@ public class TransactionService implements ITransactionService {
 
     }
 
-    /**
-     * This function simulate the client has entered his credentials to get some cash back.
-     */
     @Transactional
     @Override
     public TransactionInfoResponse withdraw(DepositWithdrawRequest request) {
