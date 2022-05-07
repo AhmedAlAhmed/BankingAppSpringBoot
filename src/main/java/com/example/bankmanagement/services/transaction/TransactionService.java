@@ -2,6 +2,7 @@ package com.example.bankmanagement.services.transaction;
 
 import com.example.bankmanagement.dto.constants.TransactionType;
 import com.example.bankmanagement.dto.requests.transactions.DepositWithdrawRequest;
+import com.example.bankmanagement.dto.requests.transactions.TransferRequest;
 import com.example.bankmanagement.dto.responses.transactions.TransactionInfoResponse;
 import com.example.bankmanagement.entities.Account;
 import com.example.bankmanagement.entities.Transaction;
@@ -116,5 +117,64 @@ public class TransactionService implements ITransactionService {
 
         return response;
 
+    }
+
+    @Transactional
+    @Override
+    public TransactionInfoResponse transfer(TransferRequest request) {
+        TransactionInfoResponse response = new TransactionInfoResponse();
+
+        Optional<Account> sourceAccountOptional = accountRepository.findById(request.getSourceAccountId());
+        Optional<Account> destinationAccountOptional = accountRepository.findById(request.getDestinationAccountId());
+
+        if (sourceAccountOptional.isEmpty() || destinationAccountOptional.isEmpty()) {
+            throw new AccountNotFoundException("Source or destination account is not found.");
+        }
+
+        Account sourceAccount = sourceAccountOptional.get();
+        Account destinationAccount = destinationAccountOptional.get();
+        // send money from source account to destination account.
+
+        if (sourceAccount.getCurrentBalance() < request.getAmount()) {
+            throw new InsufficientBalanceException("You do not have enough balance to do this operation.");
+        }
+
+        // each transfer transaction consists of 2 transactions:
+        // create withdraw transaction from source to destination.
+        // create deposit transaction from source to destination.
+
+        Transaction sourceWithdrawTransaction = new Transaction();
+        sourceWithdrawTransaction.setSourceAccount(sourceAccount);
+        sourceWithdrawTransaction.setDestinationAccount(destinationAccount);
+        sourceWithdrawTransaction.setCurrency(DEFAULT_CURRENCY);
+        sourceWithdrawTransaction.setFee(0.0);
+        sourceWithdrawTransaction.setAmount(request.getAmount());
+        sourceWithdrawTransaction.setTransactionType(TransactionType.WITHDRAW);
+
+        transactionRepository.save(sourceWithdrawTransaction);
+
+        Transaction destinationDepositTransaction = new Transaction();
+        destinationDepositTransaction.setSourceAccount(sourceAccount);
+        destinationDepositTransaction.setDestinationAccount(destinationAccount);
+        destinationDepositTransaction.setCurrency(DEFAULT_CURRENCY);
+        destinationDepositTransaction.setFee(0.0);
+        destinationDepositTransaction.setAmount(request.getAmount());
+        destinationDepositTransaction.setTransactionType(TransactionType.DEPOSIT);
+
+        transactionRepository.save(destinationDepositTransaction);
+
+        // update balances, zero fees.
+        double newSourceAccountBalance = sourceAccount.getCurrentBalance() - request.getAmount();
+        double newDestinationAccountBalance = destinationAccount.getCurrentBalance() + request.getAmount();
+
+        sourceAccount.setCurrentBalance(newSourceAccountBalance);
+        destinationAccount.setCurrentBalance(newDestinationAccountBalance);
+
+        accountRepository.save(sourceAccount);
+        accountRepository.save(destinationAccount);
+
+        BeanUtils.copyProperties(destinationDepositTransaction, response);
+        response.setAccountName(String.format("%s %s", destinationAccount.getFirstName(), destinationAccount.getLastName()));
+        return response;
     }
 }

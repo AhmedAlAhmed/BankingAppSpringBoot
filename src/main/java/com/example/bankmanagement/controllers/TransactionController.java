@@ -1,6 +1,7 @@
 package com.example.bankmanagement.controllers;
 
 import com.example.bankmanagement.dto.requests.transactions.DepositWithdrawRequest;
+import com.example.bankmanagement.dto.requests.transactions.TransferRequest;
 import com.example.bankmanagement.dto.responses.transactions.TransactionInfoResponse;
 import com.example.bankmanagement.entities.Transaction;
 import com.example.bankmanagement.services.transaction.ITransactionService;
@@ -32,6 +33,13 @@ public class TransactionController {
     @PostMapping(value = "/withdraw")
     public ResponseEntity<TransactionInfoResponse> withdraw(@RequestBody DepositWithdrawRequest request) {
         TransactionInfoResponse response = transactionService.withdraw(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Transfer amount from one account to other account")
+    @PostMapping(value = "/transfer")
+    public ResponseEntity<TransactionInfoResponse> transfer(@RequestBody TransferRequest request) {
+        TransactionInfoResponse response = transactionService.transfer(request);
         return ResponseEntity.ok(response);
     }
 }
