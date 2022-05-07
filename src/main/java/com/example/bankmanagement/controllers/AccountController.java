@@ -1,6 +1,7 @@
 package com.example.bankmanagement.controllers;
 
 import com.example.bankmanagement.dto.requests.accounts.CreateAccountRequest;
+import com.example.bankmanagement.dto.responses.accounts.AccountBalanceResponse;
 import com.example.bankmanagement.dto.responses.common.BasicResponse;
 import com.example.bankmanagement.entities.Account;
 import com.example.bankmanagement.services.account.IAccountService;
@@ -43,5 +44,13 @@ public class AccountController {
     public ResponseEntity<BasicResponse> deleteAccount(@PathVariable Long id) {
         this.accountService.deleteAccount(id);
         return ResponseEntity.ok(new BasicResponse("Account has been deleted."));
+    }
+
+    @Operation(summary = "Return the last updated balance of your account")
+    @GetMapping(value = "/{id}/balance")
+    public ResponseEntity<AccountBalanceResponse> getCurrentBalance(@PathVariable Long id) {
+
+        AccountBalanceResponse response = this.accountService.getCurrentBalance(id);
+        return ResponseEntity.ok(response);
     }
 }
