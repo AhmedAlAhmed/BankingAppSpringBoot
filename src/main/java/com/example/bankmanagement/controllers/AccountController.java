@@ -54,7 +54,9 @@ public class AccountController {
     @GetMapping(value = "/{id}/balance")
     public ResponseEntity<AccountBalanceResponse> getCurrentBalance(@PathVariable Long id) {
 
-        AccountBalanceResponse response = this.accountService.getCurrentBalance(id);
+        double currentBalance = this.accountService.getCurrentBalance(id);
+        AccountBalanceResponse response = new AccountBalanceResponse();
+        response.setCurrentBalance(currentBalance);
         return ResponseEntity.ok(response);
     }
 }
