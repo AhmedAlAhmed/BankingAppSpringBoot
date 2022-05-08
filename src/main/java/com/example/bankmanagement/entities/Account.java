@@ -19,11 +19,18 @@ public class Account {
     @Column(name = "id", nullable = false)
     private Long id;
 
+    @Column(nullable = false)
     private String firstName;
+
+    @Column(nullable = false)
     private String lastName;
+
+    @Column(nullable = false, unique = true)
     private String email;
     // avoid re-calculate the balance on every request.
-    private double currentBalance;
+
+    private double currentBalance = 0;
+
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
