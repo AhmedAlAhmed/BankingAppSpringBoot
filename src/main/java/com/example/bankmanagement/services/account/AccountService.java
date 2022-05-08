@@ -2,18 +2,15 @@ package com.example.bankmanagement.services.account;
 
 import com.example.bankmanagement.dto.requests.accounts.CreateAccountRequest;
 import com.example.bankmanagement.dto.requests.stripe.CreateStripeCustomerRequest;
-import com.example.bankmanagement.dto.responses.accounts.AccountBalanceResponse;
 import com.example.bankmanagement.entities.Account;
 import com.example.bankmanagement.exceptions.AccountNotFoundException;
 import com.example.bankmanagement.repositories.AccountRepository;
 import com.example.bankmanagement.repositories.TransactionRepository;
 import com.example.bankmanagement.services.stripe.StripeService;
-import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Customer;
 import org.springframework.beans.BeanUtils;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.core.env.Environment;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -21,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Pageable;
 
 import java.util.*;
-import java.util.logging.Logger;
 
 @Service
 public class AccountService implements IAccountService {

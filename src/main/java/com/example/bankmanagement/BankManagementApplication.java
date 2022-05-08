@@ -25,6 +25,7 @@ public class BankManagementApplication {
     public BankManagementApplication(Environment environment, PasswordEncoder passwordEncoder, UserRepository userRepository) {
         Stripe.apiKey = environment.getProperty("stripe.secret.key");
 
+        // Seeding database with an example of employee records.
         if (userRepository.count() == 0) {
             User defaultEmployee = new User();
             defaultEmployee.setEmail("admin@admin.com");
