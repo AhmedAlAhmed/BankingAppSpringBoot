@@ -96,7 +96,6 @@ public class AccountService implements IAccountService {
 
         Account account = accountOptional.get();
 
-        Logger.getGlobal().info("XXXXXXXXXXXXX");
         // Because we update the current balance on each transaction operation
         // we do not need to ho through all the transactions to calculate the current user balance.
         // this way saves times & resources.

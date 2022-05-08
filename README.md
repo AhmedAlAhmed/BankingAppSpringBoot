@@ -79,3 +79,6 @@ If you want to work with international transfer (Stripe) in our case, you need t
 [https://github.com/AhmedAlAhmed/BankingAppReactJS](https://github.com/AhmedAlAhmed/BankingAppReactJS)
 
 I have implemented a very simple code of UI in REACTJS to handle the communication with `Stripe` server.
+
+Do not forget to create a new account on `Stripe` and replace the key in 
+`application.properties` file in order to access your payments.
