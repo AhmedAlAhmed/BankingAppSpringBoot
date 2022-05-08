@@ -14,5 +14,5 @@ public interface IAccountService {
 
     void deleteAccount(long accountId);
 
-    AccountBalanceResponse getCurrentBalance(long accountId);
+    double getCurrentBalance(long accountId);
 }

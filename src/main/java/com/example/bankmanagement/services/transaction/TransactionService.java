@@ -15,12 +15,16 @@ import com.example.bankmanagement.repositories.TransactionRepository;
 import com.example.bankmanagement.services.stripe.StripeService;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Charge;
+import lombok.extern.java.Log;
 import org.springframework.beans.BeanUtils;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.logging.Logger;
 
 @Service
 public class TransactionService implements ITransactionService {
@@ -32,13 +36,16 @@ public class TransactionService implements ITransactionService {
     final AccountRepository accountRepository;
     final StripeService stripeService;
 
+    final CacheManager cacheManager;
+
     public TransactionService(TransactionRepository transactionRepository,
                               AccountRepository accountRepository,
-                              StripeService stripeService
-    ) {
+                              StripeService stripeService,
+                              CacheManager cacheManager) {
         this.transactionRepository = transactionRepository;
         this.accountRepository = accountRepository;
         this.stripeService = stripeService;
+        this.cacheManager = cacheManager;
     }
 
     /**
@@ -49,7 +56,7 @@ public class TransactionService implements ITransactionService {
      * specifying the accountID, we use the ID field as bank_account_number
      * to make the project simple as possible as.
      */
-    @CacheEvict(value = "balances", allEntries = true)
+    @CacheEvict(value = "balances")
     @Transactional
     @Override
     public TransactionInfoResponse deposit(DepositWithdrawRequest request) {
@@ -64,6 +71,10 @@ public class TransactionService implements ITransactionService {
         // update the destination account balance.
         updateAccountBalance(destinationAccount, request.getAmount());
 
+        Objects.requireNonNull(cacheManager.getCache("balances"))
+                .evictIfPresent(destinationAccount.getId());
+
+
         BeanUtils.copyProperties(createdTransaction, response);
         response.setAccountName(
                 String.format("%s %s", destinationAccount.getFirstName(), destinationAccount.getLastName())
@@ -73,7 +84,7 @@ public class TransactionService implements ITransactionService {
 
     }
 
-    @CacheEvict(value = "balances", allEntries = true)
+    @CacheEvict(value = "balances")
     @Transactional
     @Override
     public TransactionInfoResponse withdraw(DepositWithdrawRequest request) {
@@ -91,6 +102,9 @@ public class TransactionService implements ITransactionService {
         // update user current balance.
         updateAccountBalance(sourceAccount, -1 * request.getAmount());
 
+        Objects.requireNonNull(cacheManager.getCache("balances"))
+                .evictIfPresent(sourceAccount.getId());
+
         BeanUtils.copyProperties(createdTransaction, response);
         response.setAccountName(
                 String.format("%s %s", sourceAccount.getFirstName(), sourceAccount.getLastName())
@@ -100,7 +114,7 @@ public class TransactionService implements ITransactionService {
 
     }
 
-    @CacheEvict(value = "balances", allEntries = true)
+    @CacheEvict(value = "balances")
     @Transactional
     @Override
     public TransactionInfoResponse transfer(TransferRequest request) {
@@ -131,12 +145,18 @@ public class TransactionService implements ITransactionService {
         updateAccountBalance(destinationAccount, request.getAmount());
 
 
+        Objects.requireNonNull(cacheManager.getCache("balances"))
+                .evictIfPresent(sourceAccount.getId());
+
+        Objects.requireNonNull(cacheManager.getCache("balances"))
+                .evictIfPresent(destinationAccount.getId());
+
         BeanUtils.copyProperties(destinationDepositTransaction, response);
         response.setAccountName(String.format("%s %s", destinationAccount.getFirstName(), destinationAccount.getLastName()));
         return response;
     }
 
-    @CacheEvict(value = "balances", allEntries = true)
+    @CacheEvict(value = "balances")
     @Transactional
     @Override
     public TransactionInfoResponse externalTransfer(TransferRequest request) throws StripeException {
@@ -186,6 +206,9 @@ public class TransactionService implements ITransactionService {
         // update balances, zero fees.
 
         updateAccountBalance(destinationAccount, request.getAmount());
+
+        Objects.requireNonNull(cacheManager.getCache("balances"))
+                .evictIfPresent(destinationAccount.getId());
 
         BeanUtils.copyProperties(destinationDepositTransaction, response);
         response.setAccountName(String.format("%s %s", destinationAccount.getFirstName(), destinationAccount.getLastName()));

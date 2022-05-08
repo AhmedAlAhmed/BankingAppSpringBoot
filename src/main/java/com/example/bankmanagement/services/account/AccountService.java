@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Pageable;
 
 import java.util.*;
+import java.util.logging.Logger;
 
 @Service
 public class AccountService implements IAccountService {
@@ -84,10 +85,9 @@ public class AccountService implements IAccountService {
         accountRepository.deleteById(accountId);
     }
 
-    @Cacheable("balances")
+    @Cacheable(value = "balances", key = "#accountId")
     @Override
-    public AccountBalanceResponse getCurrentBalance(long accountId) {
-        AccountBalanceResponse response = new AccountBalanceResponse();
+    public double getCurrentBalance(long accountId) {
 
         Optional<Account> accountOptional = accountRepository.findById(accountId);
         if (accountOptional.isEmpty()) {
@@ -96,9 +96,11 @@ public class AccountService implements IAccountService {
 
         Account account = accountOptional.get();
 
-        // TODO Calculate the balance according to all his transactions
-        // TODO Cache the result to avoid requesting it everytime, remove the cache after each transaction.
-        response.setCurrentBalance(account.getCurrentBalance());
-        return response;
+        Logger.getGlobal().info("XXXXXXXXXXXXX");
+        // Because we update the current balance on each transaction operation
+        // we do not need to ho through all the transactions to calculate the current user balance.
+        // this way saves times & resources.
+
+        return account.getCurrentBalance();
     }
 }
