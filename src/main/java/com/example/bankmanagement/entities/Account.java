@@ -36,4 +36,9 @@ public class Account {
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
+
+
+    public boolean canTransfer(double amount) {
+        return currentBalance >= amount;
+    }
 }

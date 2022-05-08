@@ -1,5 +1,6 @@
 package com.example.bankmanagement.services.transaction;
 
+import com.example.bankmanagement.dto.constants.StripeConstants;
 import com.example.bankmanagement.dto.constants.TransactionType;
 import com.example.bankmanagement.dto.requests.stripe.StripeChargeRequest;
 import com.example.bankmanagement.dto.requests.transactions.DepositWithdrawRequest;
@@ -14,16 +15,12 @@ import com.example.bankmanagement.repositories.TransactionRepository;
 import com.example.bankmanagement.services.stripe.StripeService;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Charge;
-import com.stripe.model.Customer;
 import org.springframework.beans.BeanUtils;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
-import java.util.logging.Logger;
 
 @Service
 public class TransactionService implements ITransactionService {
@@ -58,30 +55,14 @@ public class TransactionService implements ITransactionService {
     public TransactionInfoResponse deposit(DepositWithdrawRequest request) {
         TransactionInfoResponse response = new TransactionInfoResponse();
 
-        Optional<Account> destinationAccountResult = accountRepository.findById(request.getAccountId());
-        if (destinationAccountResult.isEmpty()) {
-            throw new AccountNotFoundException("Destination account is not found!");
-        }
 
-
-        Account destinationAccount = destinationAccountResult.get();
+        Account destinationAccount = getAccountFromDepositWithdrawRequest(request);
 
         // create transaction entry.
-        Transaction transaction = new Transaction();
-        transaction.setAmount(request.getAmount());
-        transaction.setSourceAccount(null);
-        transaction.setDestinationAccount(destinationAccount);
-        transaction.setCurrency(DEFAULT_CURRENCY);
-        transaction.setFee(0.0); // zero fees for internal transactions.
-        transaction.setTransactionType(TransactionType.DEPOSIT);
-
-        Transaction createdTransaction = transactionRepository.save(transaction);
+        Transaction createdTransaction = createDepositTransaction(null, destinationAccount, request.getAmount(), 0);
 
         // update the destination account balance.
-        double newSourceAccountBalance = destinationAccount.getCurrentBalance() + request.getAmount();
-        destinationAccount.setCurrentBalance(newSourceAccountBalance);
-
-        accountRepository.save(destinationAccount);
+        updateAccountBalance(destinationAccount, request.getAmount());
 
         BeanUtils.copyProperties(createdTransaction, response);
         response.setAccountName(
@@ -97,34 +78,18 @@ public class TransactionService implements ITransactionService {
     @Override
     public TransactionInfoResponse withdraw(DepositWithdrawRequest request) {
         TransactionInfoResponse response = new TransactionInfoResponse();
-        Optional<Account> sourceAccountOptional = accountRepository.findById(request.getAccountId());
-        if (sourceAccountOptional.isEmpty()) {
-            throw new AccountNotFoundException("Source account is not found");
-        }
 
-        Account sourceAccount = sourceAccountOptional.get();
+        Account sourceAccount = getAccountFromDepositWithdrawRequest(request);
 
         // zero fees on internal transactions.
-        if (sourceAccount.getCurrentBalance() < request.getAmount()) {
+        if (!sourceAccount.canTransfer(request.getAmount())) {
             throw new InsufficientBalanceException("You do not have enough balance to do this operation.");
         }
 
-        Transaction transaction = new Transaction();
-
-        // make the transaction entry
-        transaction.setAmount(request.getAmount());
-        transaction.setCurrency(DEFAULT_CURRENCY);
-        transaction.setTransactionType(TransactionType.WITHDRAW);
-        transaction.setSourceAccount(sourceAccount);
-        transaction.setDestinationAccount(null);
-        transaction.setFee(0.0);
-
-        Transaction createdTransaction = transactionRepository.save(transaction);
+        Transaction createdTransaction = createWithdrawTransaction(sourceAccount, null, request.getAmount(), 0);
 
         // update user current balance.
-        double newSourceAccountBalance = sourceAccount.getCurrentBalance() - request.getAmount();
-        sourceAccount.setCurrentBalance(newSourceAccountBalance);
-        accountRepository.save(sourceAccount);
+        updateAccountBalance(sourceAccount, -1 * request.getAmount());
 
         BeanUtils.copyProperties(createdTransaction, response);
         response.setAccountName(
@@ -141,18 +106,15 @@ public class TransactionService implements ITransactionService {
     public TransactionInfoResponse transfer(TransferRequest request) {
         TransactionInfoResponse response = new TransactionInfoResponse();
 
-        Optional<Account> sourceAccountOptional = accountRepository.findById(request.getSourceAccountId());
-        Optional<Account> destinationAccountOptional = accountRepository.findById(request.getDestinationAccountId());
+        // Extract accounts & doing validation.
+        Account[] accounts = getAccountsFromTransferRequest(request);
 
-        if (sourceAccountOptional.isEmpty() || destinationAccountOptional.isEmpty()) {
-            throw new AccountNotFoundException("Source or destination account is not found.");
-        }
+        Account sourceAccount = accounts[0];
+        Account destinationAccount = accounts[1];
 
-        Account sourceAccount = sourceAccountOptional.get();
-        Account destinationAccount = destinationAccountOptional.get();
         // send money from source account to destination account.
 
-        if (sourceAccount.getCurrentBalance() < request.getAmount()) {
+        if (!sourceAccount.canTransfer(request.getAmount())) {
             throw new InsufficientBalanceException("You do not have enough balance to do this operation.");
         }
 
@@ -160,35 +122,14 @@ public class TransactionService implements ITransactionService {
         // create withdraw transaction from source to destination.
         // create deposit transaction from source to destination.
 
-        Transaction sourceWithdrawTransaction = new Transaction();
-        sourceWithdrawTransaction.setSourceAccount(sourceAccount);
-        sourceWithdrawTransaction.setDestinationAccount(destinationAccount);
-        sourceWithdrawTransaction.setCurrency(DEFAULT_CURRENCY);
-        sourceWithdrawTransaction.setFee(0.0);
-        sourceWithdrawTransaction.setAmount(request.getAmount());
-        sourceWithdrawTransaction.setTransactionType(TransactionType.WITHDRAW);
-
-        transactionRepository.save(sourceWithdrawTransaction);
-
-        Transaction destinationDepositTransaction = new Transaction();
-        destinationDepositTransaction.setSourceAccount(sourceAccount);
-        destinationDepositTransaction.setDestinationAccount(destinationAccount);
-        destinationDepositTransaction.setCurrency(DEFAULT_CURRENCY);
-        destinationDepositTransaction.setFee(0.0);
-        destinationDepositTransaction.setAmount(request.getAmount());
-        destinationDepositTransaction.setTransactionType(TransactionType.DEPOSIT);
-
-        transactionRepository.save(destinationDepositTransaction);
+        createWithdrawTransaction(sourceAccount, destinationAccount, request.getAmount(), 0);
+        Transaction destinationDepositTransaction = createDepositTransaction(sourceAccount, destinationAccount, request.getAmount(), 0);
 
         // update balances, zero fees.
-        double newSourceAccountBalance = sourceAccount.getCurrentBalance() - request.getAmount();
-        double newDestinationAccountBalance = destinationAccount.getCurrentBalance() + request.getAmount();
 
-        sourceAccount.setCurrentBalance(newSourceAccountBalance);
-        destinationAccount.setCurrentBalance(newDestinationAccountBalance);
+        updateAccountBalance(sourceAccount, -1 * request.getAmount());
+        updateAccountBalance(destinationAccount, request.getAmount());
 
-        accountRepository.save(sourceAccount);
-        accountRepository.save(destinationAccount);
 
         BeanUtils.copyProperties(destinationDepositTransaction, response);
         response.setAccountName(String.format("%s %s", destinationAccount.getFirstName(), destinationAccount.getLastName()));
@@ -200,23 +141,18 @@ public class TransactionService implements ITransactionService {
     @Override
     public TransactionInfoResponse externalTransfer(TransferRequest request) throws StripeException {
         TransactionInfoResponse response = new TransactionInfoResponse();
+        // Extract accounts & doing validation.
+        Account[] accounts = getAccountsFromTransferRequest(request);
 
-        Optional<Account> sourceAccountOptional = accountRepository.findById(request.getSourceAccountId());
-        Optional<Account> destinationAccountOptional = accountRepository.findById(request.getDestinationAccountId());
-
-        if (sourceAccountOptional.isEmpty() || destinationAccountOptional.isEmpty()) {
-            throw new AccountNotFoundException("Source or destination account is not found.");
-        }
-
-        Account sourceAccount = sourceAccountOptional.get();
-        Account destinationAccount = destinationAccountOptional.get();
+        Account sourceAccount = accounts[0];
+        Account destinationAccount = accounts[1];
 
         // send amount from current user card to bank stripe account.
-
-        StripeChargeRequest stripeChargeRequest = new StripeChargeRequest();
-        stripeChargeRequest.setCurrency(DEFAULT_CURRENCY);
-        stripeChargeRequest.setAmount((int) request.getAmount());
-        stripeChargeRequest.setCustomerId(sourceAccount.getStripeCustomerId());
+        StripeChargeRequest stripeChargeRequest = new StripeChargeRequest(
+                (int) request.getAmount(),
+                sourceAccount.getStripeCustomerId(),
+                DEFAULT_CURRENCY
+        );
 
         Charge charge = stripeService.createCharge(stripeChargeRequest);
 
@@ -224,11 +160,10 @@ public class TransactionService implements ITransactionService {
         // the best way to handle stripe payment is using webhook, but it will require real-server to hit it once the action triggered.
         // to make code simple as possible as, I have just waited the response from stripe server
         // and proceed according to its response.
-        if (!charge.getStatus().equalsIgnoreCase("succeeded")) {
+        if (!charge.getStatus().equalsIgnoreCase(StripeConstants.STRIPE_CHARGE_STATUS_SUCCEEDED)) {
             throw new RuntimeException("Something wrong with stripe payment.");
         }
 
-        Logger.getGlobal().info(charge.toString());
         // each transfer transaction consists of 2 transactions:
         // create withdraw transaction from source to destination.
         // create deposit transaction from source to destination.
@@ -245,33 +180,65 @@ public class TransactionService implements ITransactionService {
         }
 
 
-        Transaction sourceWithdrawTransaction = new Transaction();
-        sourceWithdrawTransaction.setSourceAccount(sourceAccount);
-        sourceWithdrawTransaction.setDestinationAccount(destinationAccount);
-        sourceWithdrawTransaction.setCurrency(DEFAULT_CURRENCY);
-        sourceWithdrawTransaction.setFee(chargeFee);
-        sourceWithdrawTransaction.setAmount(chargedAmount);
-        sourceWithdrawTransaction.setTransactionType(TransactionType.WITHDRAW);
-
-        transactionRepository.save(sourceWithdrawTransaction);
-
-        Transaction destinationDepositTransaction = new Transaction();
-        destinationDepositTransaction.setSourceAccount(sourceAccount);
-        destinationDepositTransaction.setDestinationAccount(destinationAccount);
-        destinationDepositTransaction.setCurrency(DEFAULT_CURRENCY);
-        destinationDepositTransaction.setFee(0.0);
-        destinationDepositTransaction.setAmount(request.getAmount());
-        destinationDepositTransaction.setTransactionType(TransactionType.DEPOSIT);
-
-        transactionRepository.save(destinationDepositTransaction);
+        Transaction sourceWithdrawTransaction = createWithdrawTransaction(sourceAccount, destinationAccount, chargedAmount, chargeFee);
+        Transaction destinationDepositTransaction = createDepositTransaction(sourceAccount, destinationAccount, request.getAmount(), 0);
 
         // update balances, zero fees.
-        double newDestinationAccountBalance = destinationAccount.getCurrentBalance() + request.getAmount();
-        destinationAccount.setCurrentBalance(newDestinationAccountBalance);
-        accountRepository.save(destinationAccount);
+
+        updateAccountBalance(destinationAccount, request.getAmount());
 
         BeanUtils.copyProperties(destinationDepositTransaction, response);
         response.setAccountName(String.format("%s %s", destinationAccount.getFirstName(), destinationAccount.getLastName()));
         return response;
+    }
+
+    protected Account getAccountFromDepositWithdrawRequest(DepositWithdrawRequest request) {
+        Optional<Account> account = accountRepository.findById(request.getAccountId());
+        if (account.isEmpty()) {
+            throw new AccountNotFoundException("Source account is not found");
+        }
+
+        return account.get();
+    }
+
+    protected Account[] getAccountsFromTransferRequest(TransferRequest request) {
+        Account[] accounts = new Account[2];
+        Optional<Account> sourceAccountOptional = accountRepository.findById(request.getSourceAccountId());
+        Optional<Account> destinationAccountOptional = accountRepository.findById(request.getDestinationAccountId());
+
+        if (sourceAccountOptional.isEmpty() || destinationAccountOptional.isEmpty()) {
+            throw new AccountNotFoundException("Source or destination account is not found.");
+        }
+
+        accounts[0] = sourceAccountOptional.get();
+        accounts[1] = destinationAccountOptional.get();
+
+        return accounts;
+    }
+
+    protected void updateAccountBalance(Account account, double amount) {
+        account.setCurrentBalance(account.getCurrentBalance() + amount);
+        accountRepository.save(account);
+    }
+
+    protected Transaction createDepositTransaction(Account source, Account destination, double amount, double fee) {
+        return createTransaction(source, destination, amount, fee, TransactionType.DEPOSIT);
+    }
+
+    protected Transaction createWithdrawTransaction(Account source, Account destination, double amount, double fee) {
+        return createTransaction(source, destination, amount, fee, TransactionType.WITHDRAW);
+    }
+
+    protected Transaction createTransaction(Account source, Account destination, double amount, double fee, String transactionType) {
+        Transaction transaction = new Transaction();
+        transaction.setSourceAccount(source);
+        transaction.setDestinationAccount(destination);
+        transaction.setCurrency(DEFAULT_CURRENCY);
+        transaction.setFee(fee);
+        transaction.setAmount(amount);
+        transaction.setTransactionType(transactionType);
+
+
+        return transactionRepository.save(transaction);
     }
 }
