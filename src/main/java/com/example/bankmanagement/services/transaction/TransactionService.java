@@ -1,6 +1,7 @@
 package com.example.bankmanagement.services.transaction;
 
 import com.example.bankmanagement.dto.constants.TransactionType;
+import com.example.bankmanagement.dto.requests.stripe.StripeChargeRequest;
 import com.example.bankmanagement.dto.requests.transactions.DepositWithdrawRequest;
 import com.example.bankmanagement.dto.requests.transactions.TransferRequest;
 import com.example.bankmanagement.dto.responses.transactions.TransactionInfoResponse;
@@ -10,12 +11,19 @@ import com.example.bankmanagement.exceptions.AccountNotFoundException;
 import com.example.bankmanagement.exceptions.InsufficientBalanceException;
 import com.example.bankmanagement.repositories.AccountRepository;
 import com.example.bankmanagement.repositories.TransactionRepository;
+import com.example.bankmanagement.services.stripe.StripeService;
+import com.stripe.exception.StripeException;
+import com.stripe.model.Charge;
+import com.stripe.model.Customer;
 import org.springframework.beans.BeanUtils;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
+import java.util.logging.Logger;
 
 @Service
 public class TransactionService implements ITransactionService {
@@ -25,10 +33,15 @@ public class TransactionService implements ITransactionService {
     final TransactionRepository transactionRepository;
 
     final AccountRepository accountRepository;
+    final StripeService stripeService;
 
-    public TransactionService(TransactionRepository transactionRepository, AccountRepository accountRepository) {
+    public TransactionService(TransactionRepository transactionRepository,
+                              AccountRepository accountRepository,
+                              StripeService stripeService
+    ) {
         this.transactionRepository = transactionRepository;
         this.accountRepository = accountRepository;
+        this.stripeService = stripeService;
     }
 
     /**
@@ -39,7 +52,7 @@ public class TransactionService implements ITransactionService {
      * specifying the accountID, we use the ID field as bank_account_number
      * to make the project simple as possible as.
      */
-    @CacheEvict(value="balances",  allEntries = true)
+    @CacheEvict(value = "balances", allEntries = true)
     @Transactional
     @Override
     public TransactionInfoResponse deposit(DepositWithdrawRequest request) {
@@ -79,7 +92,7 @@ public class TransactionService implements ITransactionService {
 
     }
 
-    @CacheEvict(value="balances",  allEntries = true)
+    @CacheEvict(value = "balances", allEntries = true)
     @Transactional
     @Override
     public TransactionInfoResponse withdraw(DepositWithdrawRequest request) {
@@ -122,7 +135,7 @@ public class TransactionService implements ITransactionService {
 
     }
 
-    @CacheEvict(value="balances",  allEntries = true)
+    @CacheEvict(value = "balances", allEntries = true)
     @Transactional
     @Override
     public TransactionInfoResponse transfer(TransferRequest request) {
@@ -175,6 +188,86 @@ public class TransactionService implements ITransactionService {
         destinationAccount.setCurrentBalance(newDestinationAccountBalance);
 
         accountRepository.save(sourceAccount);
+        accountRepository.save(destinationAccount);
+
+        BeanUtils.copyProperties(destinationDepositTransaction, response);
+        response.setAccountName(String.format("%s %s", destinationAccount.getFirstName(), destinationAccount.getLastName()));
+        return response;
+    }
+
+    @CacheEvict(value = "balances", allEntries = true)
+    @Transactional
+    @Override
+    public TransactionInfoResponse externalTransfer(TransferRequest request) throws StripeException {
+        TransactionInfoResponse response = new TransactionInfoResponse();
+
+        Optional<Account> sourceAccountOptional = accountRepository.findById(request.getSourceAccountId());
+        Optional<Account> destinationAccountOptional = accountRepository.findById(request.getDestinationAccountId());
+
+        if (sourceAccountOptional.isEmpty() || destinationAccountOptional.isEmpty()) {
+            throw new AccountNotFoundException("Source or destination account is not found.");
+        }
+
+        Account sourceAccount = sourceAccountOptional.get();
+        Account destinationAccount = destinationAccountOptional.get();
+
+        // send amount from current user card to bank stripe account.
+
+        StripeChargeRequest stripeChargeRequest = new StripeChargeRequest();
+        stripeChargeRequest.setCurrency(DEFAULT_CURRENCY);
+        stripeChargeRequest.setAmount((int) request.getAmount());
+        stripeChargeRequest.setCustomerId(sourceAccount.getStripeCustomerId());
+
+        Charge charge = stripeService.createCharge(stripeChargeRequest);
+
+
+        // the best way to handle stripe payment is using webhook, but it will require real-server to hit it once the action triggered.
+        // to make code simple as possible as, I have just waited the response from stripe server
+        // and proceed according to its response.
+        if (!charge.getStatus().equalsIgnoreCase("succeeded")) {
+            throw new RuntimeException("Something wrong with stripe payment.");
+        }
+
+        Logger.getGlobal().info(charge.toString());
+        // each transfer transaction consists of 2 transactions:
+        // create withdraw transaction from source to destination.
+        // create deposit transaction from source to destination.
+
+        double chargeFee = 0.0;
+        double chargedAmount = request.getAmount();
+
+        if (charge.getAmount() != null) {
+            chargedAmount = charge.getAmount();
+        }
+
+        if (charge.getApplicationFeeAmount() != null) {
+            chargeFee = charge.getApplicationFeeAmount();
+        }
+
+
+        Transaction sourceWithdrawTransaction = new Transaction();
+        sourceWithdrawTransaction.setSourceAccount(sourceAccount);
+        sourceWithdrawTransaction.setDestinationAccount(destinationAccount);
+        sourceWithdrawTransaction.setCurrency(DEFAULT_CURRENCY);
+        sourceWithdrawTransaction.setFee(chargeFee);
+        sourceWithdrawTransaction.setAmount(chargedAmount);
+        sourceWithdrawTransaction.setTransactionType(TransactionType.WITHDRAW);
+
+        transactionRepository.save(sourceWithdrawTransaction);
+
+        Transaction destinationDepositTransaction = new Transaction();
+        destinationDepositTransaction.setSourceAccount(sourceAccount);
+        destinationDepositTransaction.setDestinationAccount(destinationAccount);
+        destinationDepositTransaction.setCurrency(DEFAULT_CURRENCY);
+        destinationDepositTransaction.setFee(0.0);
+        destinationDepositTransaction.setAmount(request.getAmount());
+        destinationDepositTransaction.setTransactionType(TransactionType.DEPOSIT);
+
+        transactionRepository.save(destinationDepositTransaction);
+
+        // update balances, zero fees.
+        double newDestinationAccountBalance = destinationAccount.getCurrentBalance() + request.getAmount();
+        destinationAccount.setCurrentBalance(newDestinationAccountBalance);
         accountRepository.save(destinationAccount);
 
         BeanUtils.copyProperties(destinationDepositTransaction, response);

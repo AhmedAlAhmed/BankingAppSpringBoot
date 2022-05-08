@@ -23,4 +23,7 @@ public class CreateAccountRequest {
     @NotNull
     @Email
     private String email;
+
+    // represent the stripe token after validating the card details.
+    private String token;
 }

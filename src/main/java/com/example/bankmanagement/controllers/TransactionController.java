@@ -3,8 +3,8 @@ package com.example.bankmanagement.controllers;
 import com.example.bankmanagement.dto.requests.transactions.DepositWithdrawRequest;
 import com.example.bankmanagement.dto.requests.transactions.TransferRequest;
 import com.example.bankmanagement.dto.responses.transactions.TransactionInfoResponse;
-import com.example.bankmanagement.entities.Transaction;
 import com.example.bankmanagement.services.transaction.ITransactionService;
+import com.stripe.exception.StripeException;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,4 +44,14 @@ public class TransactionController {
         TransactionInfoResponse response = transactionService.transfer(request);
         return ResponseEntity.ok(response);
     }
+
+
+    @Operation(summary = "Transfer amount from one account to other account using his card.")
+    @PostMapping(value = "/external-transfer")
+    public ResponseEntity<TransactionInfoResponse> externalTransfer(@Valid @RequestBody TransferRequest request) throws StripeException {
+        TransactionInfoResponse response = transactionService.externalTransfer(request);
+        return ResponseEntity.ok(response);
+    }
+
+
 }
