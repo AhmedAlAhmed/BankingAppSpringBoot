@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.util.List;
 
 @RestController
@@ -23,7 +24,7 @@ public class AccountController {
 
     @Operation(summary = "Create new bank account.")
     @PostMapping(value = "")
-    public ResponseEntity<Account> createAccount(@RequestBody CreateAccountRequest request) {
+    public ResponseEntity<Account> createAccount(@Valid @RequestBody CreateAccountRequest request) {
         Account response = this.accountService.createAccount(request);
         return ResponseEntity.ok(response);
     }
