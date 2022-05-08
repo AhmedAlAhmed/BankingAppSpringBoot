@@ -3,7 +3,6 @@ package com.example.bankmanagement.controllers;
 import com.example.bankmanagement.dto.requests.transactions.DepositWithdrawRequest;
 import com.example.bankmanagement.dto.requests.transactions.TransferRequest;
 import com.example.bankmanagement.dto.responses.transactions.TransactionInfoResponse;
-import com.example.bankmanagement.entities.Transaction;
 import com.example.bankmanagement.services.transaction.ITransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.ResponseEntity;

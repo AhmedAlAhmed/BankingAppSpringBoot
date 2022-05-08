@@ -31,6 +31,8 @@ public class Account {
 
     private double currentBalance = 0;
 
+    private String stripeCustomerId;
+
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;

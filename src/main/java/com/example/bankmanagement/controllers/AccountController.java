@@ -5,6 +5,7 @@ import com.example.bankmanagement.dto.responses.accounts.AccountBalanceResponse;
 import com.example.bankmanagement.dto.responses.common.BasicResponse;
 import com.example.bankmanagement.entities.Account;
 import com.example.bankmanagement.services.account.IAccountService;
+import com.stripe.exception.StripeException;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +25,7 @@ public class AccountController {
 
     @Operation(summary = "Create new bank account.")
     @PostMapping(value = "")
-    public ResponseEntity<Account> createAccount(@Valid @RequestBody CreateAccountRequest request) {
+    public ResponseEntity<Account> createAccount(@Valid @RequestBody CreateAccountRequest request) throws StripeException {
         Account response = this.accountService.createAccount(request);
         return ResponseEntity.ok(response);
     }
