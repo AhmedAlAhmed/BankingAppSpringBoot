@@ -36,11 +36,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
-    
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Object> handleExceptions(RuntimeException exception, WebRequest webRequest) {
         BasicResponse basicResponse = new BasicResponse();
         basicResponse.setMessage("Something wrong, please check again.");
+        exception.printStackTrace();
         return new ResponseEntity<>(basicResponse, HttpStatus.BAD_REQUEST);
     }
 }
