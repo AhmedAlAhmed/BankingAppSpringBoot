@@ -9,6 +9,7 @@ import com.example.bankmanagement.exceptions.AccountNotFoundException;
 import com.example.bankmanagement.repositories.AccountRepository;
 import com.example.bankmanagement.repositories.TransactionRepository;
 import org.springframework.beans.BeanUtils;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -18,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.logging.Logger;
 
 @Service
 public class AccountService implements IAccountService {
@@ -64,6 +66,7 @@ public class AccountService implements IAccountService {
         accountRepository.deleteById(accountId);
     }
 
+    @Cacheable("balances")
     @Override
     public AccountBalanceResponse getCurrentBalance(long accountId) {
         AccountBalanceResponse response = new AccountBalanceResponse();
