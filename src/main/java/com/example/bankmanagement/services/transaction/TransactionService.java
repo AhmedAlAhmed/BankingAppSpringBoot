@@ -11,6 +11,7 @@ import com.example.bankmanagement.exceptions.InsufficientBalanceException;
 import com.example.bankmanagement.repositories.AccountRepository;
 import com.example.bankmanagement.repositories.TransactionRepository;
 import org.springframework.beans.BeanUtils;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
@@ -38,6 +39,7 @@ public class TransactionService implements ITransactionService {
      * specifying the accountID, we use the ID field as bank_account_number
      * to make the project simple as possible as.
      */
+    @CacheEvict(value="balances",  allEntries = true)
     @Transactional
     @Override
     public TransactionInfoResponse deposit(DepositWithdrawRequest request) {
@@ -77,6 +79,7 @@ public class TransactionService implements ITransactionService {
 
     }
 
+    @CacheEvict(value="balances",  allEntries = true)
     @Transactional
     @Override
     public TransactionInfoResponse withdraw(DepositWithdrawRequest request) {
@@ -119,6 +122,7 @@ public class TransactionService implements ITransactionService {
 
     }
 
+    @CacheEvict(value="balances",  allEntries = true)
     @Transactional
     @Override
     public TransactionInfoResponse transfer(TransferRequest request) {
