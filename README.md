@@ -70,3 +70,12 @@ Now our spring application will be running on port `8080` you could change it fr
 ### Access OpenAPI docs
 - Visit the link: `{{HOST}}:{{PORT}}/swagger-ui.html`
 - You could change the link from `application.properties` file.
+
+
+**NOTE: **
+
+If you want to work with international transfer (Stripe) in our case, you need to follow the instructions in this repo
+
+[https://github.com/AhmedAlAhmed/BankingAppReactJS](https://github.com/AhmedAlAhmed/BankingAppReactJS)
+
+I have implemented a very simple code of UI in REACTJS to handle the communication with `Stripe` server.

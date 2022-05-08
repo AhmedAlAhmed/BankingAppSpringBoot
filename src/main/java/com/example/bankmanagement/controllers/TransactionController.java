@@ -6,6 +6,7 @@ import com.example.bankmanagement.dto.responses.transactions.TransactionInfoResp
 import com.example.bankmanagement.services.transaction.ITransactionService;
 import com.stripe.exception.StripeException;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.validation.Valid;
 
+@SecurityRequirement(name = "bankingapp")
 @RestController
 @RequestMapping(value = "/api/v1/transactions")
 public class TransactionController {
