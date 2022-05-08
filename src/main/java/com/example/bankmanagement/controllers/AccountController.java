@@ -7,12 +7,14 @@ import com.example.bankmanagement.entities.Account;
 import com.example.bankmanagement.services.account.IAccountService;
 import com.stripe.exception.StripeException;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 import java.util.List;
 
+@SecurityRequirement(name = "bankingapp")
 @RestController
 @RequestMapping(value = "/api/v1/accounts")
 public class AccountController {
